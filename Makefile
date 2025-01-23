@@ -17,15 +17,6 @@ beauty:
 
 up:
 	composer update
-
-test:
-	XDEBUG_MODE=coverage composer exec --verbose phpunit tests --verbose
-
-test-coverage:
-	XDEBUG_MODE=coverage composer exec --verbose phpunit tests -- --coverage-clover build/logs/clover.xml
-
-test-coverage-html:
-	XDEBUG_MODE=coverage composer exec --verbose phpunit tests -- --coverage-html build/coverage/html
-
+	
 check:
 	vendor/bin/phpstan analyse --level 5 src
