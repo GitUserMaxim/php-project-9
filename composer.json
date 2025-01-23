@@ -1,0 +1,24 @@
+{
+    "name": "hexlet/code",
+    "description": "Page Analyzer",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Raychuk Maxim",
+            "email": "raychukmaxim@gmail.com"
+        }
+    ],
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.11",
+        "phpunit/phpunit": "^11.1",
+        "phpstan/phpstan": "^2.1"
+    },
+    "require": {
+        "slim/slim": "^4.14",
+        "slim/psr7": "^1.7",
+        "slim/http": "^1.4",
+        "slim/php-view": "^3.4",
+        "php-di/php-di": "^7.0"
+    }
+}
