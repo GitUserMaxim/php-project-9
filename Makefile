@@ -19,4 +19,4 @@ up:
 	composer update
 	
 check:
-	vendor/bin/phpstan analyse --level 5 src
+	vendor/bin/phpstan analyse --level 5 public
