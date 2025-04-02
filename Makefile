@@ -10,13 +10,16 @@ validate:
 	composer validate
 
 lint:
-	composer exec --verbose phpcs -- --standard=PSR12 --colors public
+	composer exec --verbose phpcs -- --standard=PSR12 --colors public src templates
 
 beauty:
-	composer exec --verbose phpcbf -- --standard=PSR12 public
+	composer exec --verbose phpcbf -- --standard=PSR12 public src templates
 
 up:
 	composer update
 	
 check:
-	vendor/bin/phpstan analyse --level 5 public
+	vendor/bin/phpstan analyse --level 5 public src templates
+
+info:
+	php -S localhost:8000 -t public
