@@ -2,78 +2,117 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+$dotenv->load();
+
 use Slim\Factory\AppFactory;
 use Slim\Views\PhpRenderer;
 use DI\Container;
-use Slim\Flash\Messages as FlashMessages;
+use Slim\Flash\Messages;
+use App\Validator;
+use App\Connect;
 
+session_start();
+
+// Настройка контейнера
 $container = new Container();
+
+// Рендерер шаблонов
 $container->set('renderer', function () {
     return new PhpRenderer(__DIR__ . '/../templates');
 });
 
-// Регистрация flash-сообщений в контейнере
+// Flash-сообщения
 $container->set('flash', function () {
-    return new FlashMessages();
+    return new Messages();
 });
 
-// Создание приложения
-$app = AppFactory::createFromContainer($container);
+// Подключение к базе данных через класс Connect
+$container->set('db', function () {
+    return Connect::getInstance()->getConnection();
+});
+//\App\Validator::validate($urlName);
+// Создание приложения с DI
+AppFactory::setContainer($container);
+$app = AppFactory::create();
 $app->addErrorMiddleware(true, true, true);
 
-// Подключение к базе данных
-$dsn = 'pgsql:host=localhost;dbname=mydb;user=maxim;password=123456';
-$db = new PDO($dsn);
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$router = $app->getRouteCollector()->getRouteParser();
 
-// Главная страница
-$app->get('/', function ($request, $response) {
-    return $this->get('renderer')->render($response, 'main.phtml');
-});
+// Главная страница с формой
+$app->get('/', function ($request, $response) use ($router) {
+    return $this->get('renderer')->render($response, 'main.phtml', [
+        'flashMessages' => $this->get('flash')->getMessages(),
+        'urlName' => ''
+    ]);
+})->setName('home');
 
-// Обработчик для добавления URL
-$app->post('/urls', function ($request, $response) use ($db) {
+// Обработчик добавления URL
+$app->post('/urls', function ($request, $response) use ($router) {
     $data = $request->getParsedBody();
-    $urlName = $data['url']['name'];
+    $urlName = trim($data['url']['name']);
 
-    // Вставка URL в базу данных
+    $errors = Validator::validate($urlName);
+
+    $db = $this->get('db');
+
+    $stmt = $db->prepare("SELECT COUNT(*) FROM urls WHERE name = :name");
+    $stmt->bindParam(':name', $urlName);
+    $stmt->execute();
+    $count = $stmt->fetchColumn();
+
+    if ($count > 0) {
+        $errors[] = 'Этот URL уже существует.';
+    }
+
+    if (!empty($errors)) {
+        foreach ($errors as $error) {
+            $this->get('flash')->addMessage('error', $error);
+        }
+
+        return $this->get('renderer')->render($response, 'main.phtml', [
+            'flashMessages' => $this->get('flash')->getMessages(),
+            'urlName' => $urlName
+        ]);
+    }
+
     $stmt = $db->prepare("INSERT INTO urls (name) VALUES (:name)");
     $stmt->bindParam(':name', $urlName);
     $stmt->execute();
 
-    // Перенаправление на главную страницу или страницу со списком URL
-    return $response->withHeader('Location', '/')->withStatus(302);
-});
+    $this->get('flash')->addMessage('success', 'URL успешно добавлен!');
+    return $response->withHeader('Location', $router->urlFor('list_urls'))->withStatus(302);
+})->setName('add_url');
 
-// Обработчик для отображения всех URL
-$app->get('/urls', function ($request, $response) use ($db) {
-    // Извлечение всех URL из базы данных
-    $stmt = $db->query("SELECT * FROM urls ORDER BY id DESC"); // Новые записи первыми
-    $urls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Отображение всех URL
+$app->get('/urls', function ($request, $response) {
+    $db = $this->get('db');
 
-    // Передача данных в шаблон
+    $stmt = $db->query("SELECT * FROM urls ORDER BY id DESC");
+    $urls = $stmt->fetchAll();
+
     return $this->get('renderer')->render($response, 'urls.phtml', [
         'urls' => $urls,
         'flashMessages' => $this->get('flash')->getMessages()
     ]);
-})->setName('urls');
+})->setName('list_urls');
 
-// Обработчик для отображения конкретного URL
-$app->get('/urls/{id}', function ($request, $response, $args) use ($db) {
-    $id = $args['id'];
+// Отображение конкретного URL
+$app->get('/urls/{id}', function ($request, $response, $args) {
+    $db = $this->get('db');
 
-    // Извлечение URL по ID
+    $id = (int) $args['id'];
+
     $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
     $stmt->execute();
-    $url = $stmt->fetch(PDO::FETCH_ASSOC);
+    $url = $stmt->fetch();
 
-    // Проверка, существует ли URL
     if (!$url) {
         return $response->withStatus(404)->write('URL not found');
     }
 
-    // Передача данных в шаблон
     return $this->get('renderer')->render($response, 'url.phtml', [
         'url' => $url
     ]);

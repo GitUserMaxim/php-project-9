@@ -1,6 +1,6 @@
 <?php
 
-namespace  Php\Project9;
+namespace App;
 
 class Connect
 {

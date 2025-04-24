@@ -28,7 +28,7 @@
     },
     "autoload": {
         "psr-4": {
-            "PHP\\PROJECT-9\\": "src/"
+            "App\\": "src/"
         }
     }
 }

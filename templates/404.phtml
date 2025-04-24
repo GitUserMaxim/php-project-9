@@ -1,0 +1,30 @@
+<main class="flex-grow-1">
+    <div class="container-lg mt-3">
+
+        <?php if (!empty($flashMessages['error'])): ?>
+            <div class="alert alert-danger" role="alert">
+                <ul class="mb-0">
+                    <?php foreach ($flashMessages['error'] as $error): ?>
+                        <li><?= htmlspecialchars($error) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($flashMessages['success'])): ?>
+            <div class="alert alert-success" role="alert">
+                <?= htmlspecialchars(implode(', ', $flashMessages['success'])) ?>
+            </div>
+        <?php endif; ?>
+
+        <p class="display-1 d-flex justify-content-center w-100 my-4">404</p>
+        <h1 class="text-center">Такой страницы у нас нет :(</h1>
+        <p class="text-center">Похоже Вы допустили опечаптку, набирая адрес, или воспользовались неисправной ссылкой</p>
+        <div class="d-flex justify-content-center w-100 my-4">
+            <div class="d-flex gap-3 w-75">
+                <a href="/" class="btn btn-primary text-white text-decoration-none flex-fill py-2">На главную</a>
+                <a href="/urls" class="btn btn-secondary text-white text-decoration-none flex-fill py-2">К списку URLS</a>
+            </div>
+        </div>   
+    </div>
+</main>

@@ -31,7 +31,17 @@
     <main class="flex-grow-1">
         <div class="container-lg mt-3">
             <h1>Сайты</h1>
-
+            <?php if (!empty($flashMessages)): ?>
+        <div style="margin-bottom: 20px;">
+            <?php foreach ($flashMessages as $type => $messages): ?>
+                <?php foreach ($messages as $message): ?>
+                    <div style="padding: 10px; border: 1px solid <?= $type === 'error' ? 'red' : 'green' ?>; background-color: <?= $type === 'error' ? '#f8d7da' : '#d4edda' ?>; color: <?= $type === 'error' ? 'red' : 'green' ?>; margin-bottom: 10px;">
+                        <?= htmlspecialchars($message) ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover text-nowrap" data-test="urls">
                     <thead>
