@@ -3,8 +3,8 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->load();
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+// $dotenv->load();
 
 use Slim\Factory\AppFactory;
 use Slim\Views\PhpRenderer;
@@ -30,9 +30,9 @@ $container->set('flash', function () {
 
 // Подключение к базе данных через класс Connect
 $container->set('db', function () {
-    return Connect::getInstance()->getConnection();
+    return \App\Connect::getInstance()->getConnection();
 });
-//\App\Validator::validate($urlName);
+
 // Создание приложения с DI
 AppFactory::setContainer($container);
 $app = AppFactory::create();

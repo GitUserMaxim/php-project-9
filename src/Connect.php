@@ -51,11 +51,3 @@ class Connect
         return $this->connection;
     }
 }
-
-// Использование:
-// Чтобы использовать этот класс, вы можете сделать следующее:
-
-// php
-// Copy code
-// $connection = Connect::getInstance()->getConnection();
-// // Теперь вы можете использовать $connection для выполнения запросов к базе данных.
