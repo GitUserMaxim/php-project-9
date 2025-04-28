@@ -2,10 +2,6 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-
-// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-// $dotenv->load();
-
 use Slim\Factory\AppFactory;
 use Slim\Views\PhpRenderer;
 use DI\Container;
@@ -57,13 +53,14 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     $db = $this->get('db');
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM urls WHERE name = :name");
+    $stmt = $db->prepare("SELECT id FROM urls WHERE name = :name");
     $stmt->bindParam(':name', $urlName);
     $stmt->execute();
-    $count = $stmt->fetchColumn();
+    $existingUrl = $stmt->fetch();
 
-    if ($count > 0) {
-        $errors[] = 'Этот URL уже существует.';
+    if ($existingUrl) {
+        $this->get('flash')->addMessage('success', 'Страница уже существует');
+        return $response->withHeader('Location', $router->urlFor('url_details', ['id' => $existingUrl['id']]))->withStatus(302);
     }
 
     if (!empty($errors)) {
@@ -81,7 +78,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
     $stmt->bindParam(':name', $urlName);
     $stmt->execute();
 
-    $this->get('flash')->addMessage('success', 'URL успешно добавлен!');
+    $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     return $response->withHeader('Location', $router->urlFor('list_urls'))->withStatus(302);
 })->setName('add_url');
 
@@ -89,7 +86,15 @@ $app->post('/urls', function ($request, $response) use ($router) {
 $app->get('/urls', function ($request, $response) {
     $db = $this->get('db');
 
-    $stmt = $db->query("SELECT * FROM urls ORDER BY id DESC");
+    $sql = "SELECT urls.id, urls.name, urls.created_at,
+    MAX(url_checks.created_at) AS last_check,
+    MAX(url_checks.status_code) AS response_code
+    FROM urls
+    LEFT JOIN url_checks ON urls.id = url_checks.url_id
+    GROUP BY urls.id, urls.name, urls.created_at
+    ORDER BY urls.id DESC";
+
+    $stmt = $db->query($sql);
     $urls = $stmt->fetchAll();
 
     return $this->get('renderer')->render($response, 'urls.phtml', [
@@ -101,22 +106,54 @@ $app->get('/urls', function ($request, $response) {
 // Отображение конкретного URL
 $app->get('/urls/{id}', function ($request, $response, $args) {
     $db = $this->get('db');
-
     $id = (int) $args['id'];
-
     $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
     $stmt->execute();
     $url = $stmt->fetch();
 
     if (!$url) {
-        return $response->withStatus(404)->write('URL not found');
+        return $response->withStatus(404)->write('URL не найден');
     }
 
+    // Получаем список проверок для данного URL
+    $stmtChecks = $db->prepare("SELECT * FROM url_checks WHERE url_id = :url_id ORDER BY id DESC");
+    $stmtChecks->bindParam(':url_id', $id, PDO::PARAM_INT);
+    $stmtChecks->execute();
+    $checks = $stmtChecks->fetchAll();
+
     return $this->get('renderer')->render($response, 'url.phtml', [
-        'url' => $url
+        'url' => $url,
+        'checks' => $checks, // Передаем список проверок в шаблон
+        'flashMessages' => $this->get('flash')->getMessages()
     ]);
-});
+})->setName('url_details');
+
+// Обработчик создания новой проверки
+$app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($router) {
+    $urlId = (int) $args['url_id'];
+    $db = $this->get('db');
+    $now = date('Y-m-d H:i:s');
+
+    // Проверяем, существует ли URL
+    $stmtSelectUrl = $db->prepare("SELECT id FROM urls WHERE id = :id");
+    $stmtSelectUrl->bindParam(':id', $urlId, PDO::PARAM_INT);
+    $stmtSelectUrl->execute();
+    $url = $stmtSelectUrl->fetch();
+
+    if (!$url) {
+        return $response->withStatus(404)->write('URL не найден');
+    }
+
+    // Создаем новую запись о проверке
+    $stmtInsertCheck = $db->prepare("INSERT INTO url_checks (url_id, created_at) VALUES (:url_id, :created_at)");
+    $stmtInsertCheck->bindParam(':url_id', $urlId, PDO::PARAM_INT);
+    $stmtInsertCheck->bindParam(':created_at', $now);
+    $stmtInsertCheck->execute();
+
+    $this->get('flash')->addMessage('success', 'Страница успешно проверена');
+    return $response->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))->withStatus(302);
+})->setName('create_check');
 
 // Запуск приложения
 $app->run();

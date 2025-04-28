@@ -1,5 +1,5 @@
-<html>
-
+<!DOCTYPE html>
+<html lang="ru">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,11 +21,27 @@
                         <a class="nav-link" href="/">Главная</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/urls">Сайты</a>
+                        <a class="nav-link active" href="/urls">Сайты</a>
                     </li>
                 </ul>
             </div>
         </nav>
+
+        <?php if (!empty($flashMessages['success'])): ?>
+            <div class="alert alert-success mb-0 rounded-0" role="alert">
+                <?php foreach ($flashMessages['success'] as $message): ?>
+                    <?= htmlspecialchars($message) ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($flashMessages['error'])): ?>
+            <div class="alert alert-danger mb-0 rounded-0" role="alert">
+                <?php foreach ($flashMessages['error'] as $message): ?>
+                    <?= htmlspecialchars($message) ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </header>
 
     <main class="flex-grow-1">
@@ -56,7 +72,7 @@
                 <input type="submit" class="btn btn-primary" value="Запустить проверку">
             </form>
 
-            <!-- Здесь можно добавить таблицу с результатами проверок -->
+
             <table class="table table-bordered table-hover" data-test="checks">
                 <thead>
                     <tr>
@@ -69,16 +85,20 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($checks as $check): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($check['id']) ?></td>
-                            <td><?= htmlspecialchars($check['status_code']) ?></td>
-                            <td><?= htmlspecialchars($check['h1']) ?></td>
-                            <td><?= htmlspecialchars($check['title']) ?></td>
-                            <td><?= htmlspecialchars($check['description']) ?></td>
-                            <td><?= htmlspecialchars($check['created_at']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
+                    <?php if (!empty($checks)): ?>
+                        <?php foreach ($checks as $check): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($check['id']) ?></td>
+                                <td><?= htmlspecialchars($check['status_code'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($check['h1'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($check['title'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($check['description'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($check['created_at']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="6" class="text-center">Нет проверок для этого URL</td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

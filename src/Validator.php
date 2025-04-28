@@ -9,7 +9,7 @@ class Validator
         $errors = [];
 
         if (empty($url)) {
-            $errors[] = 'Адрес обязателен для заполнения.';
+            $errors[] = 'URL не должен быть пустым';
         }
 
         if (mb_strlen($url) > 255) {
@@ -17,20 +17,10 @@ class Validator
         }
 
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            $errors[] = 'Некорректный формат URL.';
+            $errors[] = 'Некорректный URL';
         }
 
         return $errors;
     }
 
-    public static function normalize(string $url): string
-    {
-        $parsed = parse_url($url);
-
-        if (!isset($parsed['scheme']) || !isset($parsed['host'])) {
-            return $url; // Вернём как есть, если разбор невозможен
-        }
-
-        return strtolower($parsed['scheme']) . '://' . strtolower($parsed['host']);
-    }
 }

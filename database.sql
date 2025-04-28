@@ -7,9 +7,9 @@ CREATE TABLE url_checks (
     id SERIAL PRIMARY KEY,
     url_id INT NOT NULL,
     status_code INT,
-    h1 TEXT,
-    title TEXT,
-    description TEXT,
+    h1 TEXT NULL,
+    title TEXT NULL,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (url_id) REFERENCES urls(id)
 );
