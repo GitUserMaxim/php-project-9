@@ -22,5 +22,4 @@ class Validator
 
         return $errors;
     }
-
 }

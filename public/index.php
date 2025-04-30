@@ -8,6 +8,9 @@ use DI\Container;
 use Slim\Flash\Messages;
 use App\Validator;
 use App\Connect;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
 
 session_start();
 
@@ -133,26 +136,61 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
 $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($router) {
     $urlId = (int) $args['url_id'];
     $db = $this->get('db');
-    $now = date('Y-m-d H:i:s');
 
-    // Проверяем, существует ли URL
-    $stmtSelectUrl = $db->prepare("SELECT id FROM urls WHERE id = :id");
-    $stmtSelectUrl->bindParam(':id', $urlId, PDO::PARAM_INT);
-    $stmtSelectUrl->execute();
-    $url = $stmtSelectUrl->fetch();
+    // Получение URL из БД
+    $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
+    $stmt->bindParam(':id', $urlId, PDO::PARAM_INT);
+    $stmt->execute();
+    $url = $stmt->fetch();
 
     if (!$url) {
         return $response->withStatus(404)->write('URL не найден');
     }
 
-    // Создаем новую запись о проверке
-    $stmtInsertCheck = $db->prepare("INSERT INTO url_checks (url_id, created_at) VALUES (:url_id, :created_at)");
-    $stmtInsertCheck->bindParam(':url_id', $urlId, PDO::PARAM_INT);
-    $stmtInsertCheck->bindParam(':created_at', $now);
-    $stmtInsertCheck->execute();
+    $client = new Client(['timeout' => 10.0]);
+    $now = date('Y-m-d H:i:s');
 
-    $this->get('flash')->addMessage('success', 'Страница успешно проверена');
-    return $response->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))->withStatus(302);
+    try {
+        $res = $client->request('GET', $url['name']);
+        $statusCode = $res->getStatusCode();
+
+        $stmt = $db->prepare("
+            INSERT INTO url_checks (url_id, status_code, created_at)
+            VALUES (:url_id, :status_code, :created_at)
+        ");
+        $stmt->execute([
+            ':url_id' => $urlId,
+            ':status_code' => $statusCode,
+            ':created_at' => $now
+        ]);
+
+        $this->get('flash')->addMessage('success', "Страница успешно проверена");
+    } catch (ConnectException $e) {
+        $this->get('flash')->addMessage('error', 'Произошла ошибка при проверке, не удалось подключиться');
+    } catch (RequestException $e) {
+        $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : null;
+
+        if ($statusCode !== null) {
+            // Даже при ошибке 404/500 сохраняем код
+            $stmt = $db->prepare("
+                INSERT INTO url_checks (url_id, status_code, created_at)
+                VALUES (:url_id, :status_code, :created_at)
+            ");
+            $stmt->execute([
+                ':url_id' => $urlId,
+                ':status_code' => $statusCode,
+                ':created_at' => $now
+            ]);
+
+            $this->get('flash')->addMessage('error', "Ошибка ответа. Код: $statusCode");
+        } else {
+            $this->get('flash')->addMessage('error', 'Ошибка запроса. Код ответа отсутствует.');
+        }
+    }
+
+    return $response
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
+        ->withStatus(302);
 })->setName('create_check');
 
 // Запуск приложения

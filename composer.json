@@ -24,7 +24,8 @@
         "nesbot/carbon": "^3.8",
         "vlucas/valitron": "^1.4",
         "illuminate/support": "^11.43",
-        "slim/flash": "^0.4.0"
+        "slim/flash": "^0.4.0",
+        "guzzlehttp/guzzle": "^7.9"
     },
     "autoload": {
         "psr-4": {
