@@ -11,6 +11,8 @@ use App\Connect;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use Carbon\Carbon;
+use DiDom\Document;
 
 session_start();
 
@@ -63,7 +65,10 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     if ($existingUrl) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
-        return $response->withHeader('Location', $router->urlFor('url_details', ['id' => $existingUrl['id']]))->withStatus(302);
+        $url = $router->urlFor('url_details', ['id' => $existingUrl['id']]);
+        return $response
+        ->withHeader('Location', $url)
+        ->withStatus(302);
     }
 
     if (!empty($errors)) {
@@ -80,22 +85,28 @@ $app->post('/urls', function ($request, $response) use ($router) {
     $stmt = $db->prepare("INSERT INTO urls (name) VALUES (:name)");
     $stmt->bindParam(':name', $urlName);
     $stmt->execute();
+    $urlId = $db->lastInsertId(); // Получаем ID только что добавленной записи
 
     $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
-    return $response->withHeader('Location', $router->urlFor('list_urls'))->withStatus(302);
+    return $response
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
+        ->withStatus(302);
 })->setName('add_url');
+
 
 // Отображение всех URL
 $app->get('/urls', function ($request, $response) {
     $db = $this->get('db');
 
-    $sql = "SELECT urls.id, urls.name, urls.created_at,
-    MAX(url_checks.created_at) AS last_check,
-    MAX(url_checks.status_code) AS response_code
+    $sql = "SELECT DISTINCT ON (urls.id)
+    urls.id,
+    urls.name,
+    urls.created_at,
+    url_checks.created_at AS last_check,
+    url_checks.status_code AS response_code
     FROM urls
     LEFT JOIN url_checks ON urls.id = url_checks.url_id
-    GROUP BY urls.id, urls.name, urls.created_at
-    ORDER BY urls.id DESC";
+    ORDER BY urls.id DESC, url_checks.created_at DESC";
 
     $stmt = $db->query($sql);
     $urls = $stmt->fetchAll();
@@ -127,7 +138,7 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
 
     return $this->get('renderer')->render($response, 'url.phtml', [
         'url' => $url,
-        'checks' => $checks, // Передаем список проверок в шаблон
+        'checks' => $checks,
         'flashMessages' => $this->get('flash')->getMessages()
     ]);
 })->setName('url_details');
@@ -148,19 +159,30 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
     }
 
     $client = new Client(['timeout' => 10.0]);
-    $now = date('Y-m-d H:i:s');
+    $now = Carbon::now();
 
     try {
         $res = $client->request('GET', $url['name']);
         $statusCode = $res->getStatusCode();
+        $html = $res->getBody()->getContents();
 
+         // SEO-анализ через DiDOM
+         $document = new Document($html);
+         $h1 = optional($document->first('h1'))->text();
+         $title = optional($document->first('title'))->text();
+         $description = optional($document->first('meta[name=description]'))->getAttribute('content');
+
+        // Сохраняем данные в таблицу url_checks
         $stmt = $db->prepare("
-            INSERT INTO url_checks (url_id, status_code, created_at)
-            VALUES (:url_id, :status_code, :created_at)
+            INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
+            VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)
         ");
         $stmt->execute([
             ':url_id' => $urlId,
             ':status_code' => $statusCode,
+            ':h1' => $h1,
+            ':title' => $title,
+            ':description' => $description,
             ':created_at' => $now
         ]);
 
@@ -187,11 +209,11 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
             $this->get('flash')->addMessage('error', 'Ошибка запроса. Код ответа отсутствует.');
         }
     }
-
+    $url = $router->urlFor('url_details', ['id' => $urlId]);
     return $response
-        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
-        ->withStatus(302);
+    ->withHeader('Location', $url)
+    ->withStatus(302);
 })->setName('create_check');
 
-// Запуск приложения
+
 $app->run();

@@ -25,7 +25,8 @@
         "vlucas/valitron": "^1.4",
         "illuminate/support": "^11.43",
         "slim/flash": "^0.4.0",
-        "guzzlehttp/guzzle": "^7.9"
+        "guzzlehttp/guzzle": "^7.9",
+        "imangazaliev/didom": "^2.0"
     },
     "autoload": {
         "psr-4": {
