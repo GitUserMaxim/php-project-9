@@ -24,3 +24,10 @@ make start
 ```
 
 Open in browser: http://localhost:8000
+
+Badges
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=GitUser Maxim_php-project-9&metric=bugs)](https://sonarcloud.io/summary/new_code?id=GitUser Maxim_php-project-9)
+
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=GitUser Maxim_php-project-9&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=GitUser Maxim_php-project-9)
+
+[![Duplicated Lines (%)](https://sonarcloud.io/api/project_badges/measure?project=GitUser Maxim_php-project-9&metric=duplicated_lines_density)](https://sonarcloud.io/summary/new_code?id=GitUser Maxim_php-project-9)

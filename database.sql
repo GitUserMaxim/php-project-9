@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS urls (
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP(0) DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE url_checks (
+CREATE TABLE IF NOT EXISTS url_checks (
     id SERIAL PRIMARY KEY,
     url_id INT NOT NULL,
     status_code INT,
