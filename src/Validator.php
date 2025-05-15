@@ -10,6 +10,7 @@ class Validator
 
         if (empty($url)) {
             $errors[] = 'URL не должен быть пустым';
+            return $errors;
         }
 
         if (mb_strlen($url) > 255) {
@@ -17,6 +18,13 @@ class Validator
         }
 
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $errors[] = 'Некорректный URL';
+            return $errors;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        if ($scheme !== 'http' && $scheme !== 'https') {
             $errors[] = 'Некорректный URL';
         }
 

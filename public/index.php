@@ -57,6 +57,13 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     $errors = Validator::validate($urlName);
 
+    if (!empty($errors)) {
+        return $this->get('renderer')->render($response->withStatus(422), 'main.phtml', [
+            'errors' => $errors,
+            'urlName' => $urlName
+        ]);
+    }
+
     $db = $this->get('db');
 
     $stmt = $db->prepare("SELECT id FROM urls WHERE name = :name");
@@ -68,28 +75,21 @@ $app->post('/urls', function ($request, $response) use ($router) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
         $url = $router->urlFor('url_details', ['id' => $existingUrl['id']]);
         return $response
-        ->withHeader('Location', $url)
-        ->withStatus(302);
+            ->withHeader('Location', $url)
+            ->withStatus(302);
     }
-
-    if (!empty($errors)) {
-    return $this->get('renderer')->render($response, 'main.phtml', [
-        'errors' => $errors,
-        'urlName' => $urlName
-    ]);
-}
-
 
     $stmt = $db->prepare("INSERT INTO urls (name) VALUES (:name)");
     $stmt->bindParam(':name', $urlName);
     $stmt->execute();
-    $urlId = $db->lastInsertId(); // Получаем ID только что добавленной записи
+    $urlId = $db->lastInsertId();
 
     $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     return $response
         ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
         ->withStatus(302);
 })->setName('add_url');
+
 
 
 // Отображение всех URL
