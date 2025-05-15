@@ -42,11 +42,10 @@ $app->addErrorMiddleware(true, true, true);
 $router = $app->getRouteCollector()->getRouteParser();
 
 // Главная страница с формой
-$app->get('/', function ($request, $response) use ($router) {
+$app->get('/', function ($request, $response) {
     return $this->get('renderer')->render($response, 'main.phtml', [
         'flashMessages' => $this->get('flash')->getMessages(),
         'urlName' => '',
-        'flashMessages' => $this->get('flash')->getMessages(),
     ]);
 })->setName('home');
 
@@ -73,7 +72,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     if ($existingUrl) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
-        $url = $router->urlFor('url_details', ['id' => $existingUrl['id']]);
+        $url = $router->urlFor('url_details', ['id' => (string)$existingUrl['id']]);
         return $response
             ->withHeader('Location', $url)
             ->withStatus(302);
@@ -86,7 +85,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
 
     $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     return $response
-        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => (string)$urlId]))
         ->withStatus(302);
 })->setName('add_url');
 
@@ -165,10 +164,15 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $html = $res->getBody()->getContents();
 
          // SEO-анализ через DiDOM
-         $document = new Document($html);
-         $h1 = optional($document->first('h1'))->text();
-         $title = optional($document->first('title'))->text();
-         $description = optional($document->first('meta[name=description]'))->getAttribute('content');
+        $document = new Document($html);
+        $h1Element = $document->first('h1');
+        $h1 = $h1Element ? $h1Element->text() : null;
+
+        $titleElement = $document->first('title');
+        $title = $titleElement ? $titleElement->text() : null;
+
+        $descElement = $document->first('meta[name=description]');
+        $description = $descElement ? $descElement->getAttribute('content') : null;
 
         // Сохраняем данные в таблицу url_checks
         $stmt = $db->prepare("
@@ -207,7 +211,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
             $this->get('flash')->addMessage('error', 'Ошибка запроса. Код ответа отсутствует.');
         }
     }
-    $url = $router->urlFor('url_details', ['id' => $urlId]);
+    $url = $router->urlFor('url_details', ['id' => (string)$urlId]);
     return $response
     ->withHeader('Location', $url)
     ->withStatus(302);

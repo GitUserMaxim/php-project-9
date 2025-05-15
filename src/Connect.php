@@ -31,7 +31,7 @@ class Connect
         $password = $databaseUrl['pass'] ?? '';
         $host = $databaseUrl['host'] ?? 'localhost';
         $port = $databaseUrl['port'] ?? 5432;
-        $dbName = ltrim($databaseUrl['path'], '/') ?: 'mydb';
+        $dbName = ltrim($databaseUrl['path'] ?? '', '/') ?: 'mydb';
 
         $dsn = "pgsql:host=$host;port=$port;dbname=$dbName";
         $options = [
