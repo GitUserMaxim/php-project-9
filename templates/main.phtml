@@ -62,11 +62,11 @@
                                 id="url-input"
                                 name="url[name]"
                                 value="<?= isset($urlName) ? htmlspecialchars($urlName) : '' ?>"
-                                class="form-control form-control-lg <?= !empty($flashMessages['error']) ? 'is-invalid' : '' ?>"
+                                class="form-control form-control-lg <?= !empty($errors) ? 'is-invalid' : '' ?>"
                                 placeholder="https://www.example.com">
-                            <?php if (!empty($flashMessages['error'])): ?>
+                            <?php if (!empty($errors)): ?>
                                 <div class="invalid-feedback">
-                                    <?= htmlspecialchars($flashMessages['error'][0]) ?>
+                                    <?= htmlspecialchars($errors[0]) ?>
                                 </div>
                             <?php endif; ?>
                         </div>

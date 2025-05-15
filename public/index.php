@@ -45,7 +45,8 @@ $router = $app->getRouteCollector()->getRouteParser();
 $app->get('/', function ($request, $response) use ($router) {
     return $this->get('renderer')->render($response, 'main.phtml', [
         'flashMessages' => $this->get('flash')->getMessages(),
-        'urlName' => ''
+        'urlName' => '',
+        'flashMessages' => $this->get('flash')->getMessages(),
     ]);
 })->setName('home');
 
@@ -72,15 +73,12 @@ $app->post('/urls', function ($request, $response) use ($router) {
     }
 
     if (!empty($errors)) {
-        foreach ($errors as $error) {
-            $this->get('flash')->addMessage('error', $error);
-        }
+    return $this->get('renderer')->render($response, 'main.phtml', [
+        'errors' => $errors,
+        'urlName' => $urlName
+    ]);
+}
 
-        return $this->get('renderer')->render($response, 'main.phtml', [
-            'flashMessages' => $this->get('flash')->getMessages(),
-            'urlName' => $urlName
-        ]);
-    }
 
     $stmt = $db->prepare("INSERT INTO urls (name) VALUES (:name)");
     $stmt->bindParam(':name', $urlName);
