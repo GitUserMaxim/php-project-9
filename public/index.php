@@ -124,7 +124,8 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
     $url = $stmt->fetch();
 
     if (!$url) {
-        return $response->withStatus(404)->write('URL не найден');
+        $renderer = $this->get('renderer');
+        return $renderer->render($response->withStatus(404), '404.phtml');
     }
 
     // Получаем список проверок для данного URL
@@ -164,15 +165,10 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $html = $res->getBody()->getContents();
 
          // SEO-анализ через DiDOM
-        $document = new Document($html);
-        $h1Element = $document->first('h1');
-        $h1 = $h1Element ? $h1Element->text() : null;
-
-        $titleElement = $document->first('title');
-        $title = $titleElement ? $titleElement->text() : null;
-
-        $descElement = $document->first('meta[name=description]');
-        $description = $descElement ? $descElement->getAttribute('content') : null;
+         $document = new Document($html);
+         $h1 = optional($document->first('h1'))->text();
+         $title = optional($document->first('title'))->text();
+         $description = $document->first('meta[name=description]')?->getAttribute('content');
 
         // Сохраняем данные в таблицу url_checks
         $stmt = $db->prepare("
