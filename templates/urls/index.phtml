@@ -1,0 +1,27 @@
+<h1>Сайты</h1>
+<div class="table-responsive">
+    <table class="table table-bordered table-hover text-nowrap" data-test="urls">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Имя</th>
+                <th>Последняя проверка</th>
+                <th>Код ответа</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($urls)): ?>
+                <tr><td colspan="4" class="text-center">Нет добавленных URL.</td></tr>
+            <?php else: ?>
+                <?php foreach ($urls as $url): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($url['id']) ?></td>
+                        <td><a href="/urls/<?= htmlspecialchars($url['id']) ?>"><?= htmlspecialchars($url['name']) ?></a></td>
+                        <td><?= htmlspecialchars($url['last_check'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($url['response_code'] ?? '') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>

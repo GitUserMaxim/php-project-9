@@ -21,7 +21,9 @@ $container = new Container();
 
 // Рендерер шаблонов
 $container->set('renderer', function () {
-    return new PhpRenderer(__DIR__ . '/../templates');
+    $renderer = new PhpRenderer(__DIR__ . '/../templates');
+    $renderer->setLayout('layout.phtml');
+    return $renderer;
 });
 
 // Flash-сообщения
@@ -41,9 +43,9 @@ $app->addErrorMiddleware(true, true, true);
 
 $router = $app->getRouteCollector()->getRouteParser();
 
-// Главная страница с формой
+// Главная страница
 $app->get('/', function ($request, $response) {
-    return $this->get('renderer')->render($response, 'main.phtml', [
+    return $this->get('renderer')->render($response, 'home.phtml', [
         'flashMessages' => $this->get('flash')->getMessages(),
         'urlName' => '',
     ]);
@@ -57,7 +59,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
     $errors = Validator::validate($urlName);
 
     if (!empty($errors)) {
-        return $this->get('renderer')->render($response->withStatus(422), 'main.phtml', [
+        return $this->get('renderer')->render($response->withStatus(422), 'home.phtml', [
             'errors' => $errors,
             'urlName' => $urlName
         ]);
@@ -108,7 +110,7 @@ $app->get('/urls', function ($request, $response) {
     $stmt = $db->query($sql);
     $urls = $stmt->fetchAll();
 
-    return $this->get('renderer')->render($response, 'urls.phtml', [
+    return $this->get('renderer')->render($response, 'urls/index.phtml', [
         'urls' => $urls,
         'flashMessages' => $this->get('flash')->getMessages()
     ]);
@@ -125,7 +127,7 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
 
     if (!$url) {
         $renderer = $this->get('renderer');
-        return $renderer->render($response->withStatus(404), '404.phtml');
+        return $renderer->render($response->withStatus(404), 'errors/404.phtml');
     }
 
     // Получаем список проверок для данного URL
@@ -134,7 +136,7 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
     $stmtChecks->execute();
     $checks = $stmtChecks->fetchAll();
 
-    return $this->get('renderer')->render($response, 'url.phtml', [
+    return $this->get('renderer')->render($response, 'urls/show.phtml', [
         'url' => $url,
         'checks' => $checks,
         'flashMessages' => $this->get('flash')->getMessages()
