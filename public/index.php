@@ -8,6 +8,8 @@ use DI\Container;
 use Slim\Flash\Messages;
 use App\Validator;
 use App\Connect;
+use App\Database\Url;
+use App\Database\UrlCheck;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
@@ -16,10 +18,10 @@ use DiDom\Document;
 
 session_start();
 
-// Настройка контейнера
+// Контейнер
 $container = new Container();
 
-// Рендерер шаблонов
+// Рендерер
 $container->set('renderer', function () {
     $renderer = new PhpRenderer(__DIR__ . '/../templates');
     $renderer->setLayout('layout.phtml');
@@ -27,16 +29,14 @@ $container->set('renderer', function () {
 });
 
 // Flash-сообщения
-$container->set('flash', function () {
-    return new Messages();
-});
+$container->set('flash', fn() => new Messages());
 
-// Подключение к базе данных через класс Connect
-$container->set('db', function () {
-    return \App\Connect::getInstance()->getConnection();
-});
+// БД и DAO
+$container->set('db', fn() => Connect::getInstance()->getConnection());
+$container->set(Url::class, fn($c) => new Url($c->get('db')));
+$container->set(UrlCheck::class, fn($c) => new UrlCheck($c->get('db')));
 
-// Создание приложения с DI
+// Приложение
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 $app->addErrorMiddleware(true, true, true);
@@ -51,11 +51,10 @@ $app->get('/', function ($request, $response) {
     ]);
 })->setName('home');
 
-// Обработчик добавления URL
+// Добавление URL
 $app->post('/urls', function ($request, $response) use ($router) {
     $data = $request->getParsedBody();
     $urlName = trim($data['url']['name']);
-
     $errors = Validator::validate($urlName);
 
     if (!empty($errors)) {
@@ -65,48 +64,31 @@ $app->post('/urls', function ($request, $response) use ($router) {
         ]);
     }
 
-    $db = $this->get('db');
-
-    $stmt = $db->prepare("SELECT id FROM urls WHERE name = :name");
-    $stmt->bindParam(':name', $urlName);
-    $stmt->execute();
-    $existingUrl = $stmt->fetch();
+    $urlModel = $this->get(Url::class);
+    $existingUrl = $urlModel->findByName($urlName);
 
     if ($existingUrl) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
-        $url = $router->urlFor('url_details', ['id' => (string)$existingUrl['id']]);
         return $response
-            ->withHeader('Location', $url)
+            ->withHeader('Location', $router->urlFor('url_details', ['id' => $existingUrl['id']]))
             ->withStatus(302);
     }
 
-    $stmt = $db->prepare("INSERT INTO urls (name) VALUES (:name)");
-    $stmt->bindParam(':name', $urlName);
-    $stmt->execute();
-    $urlId = $db->lastInsertId();
-
+    $urlId = $urlModel->insert($urlName);
     $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
     return $response
-        ->withHeader('Location', $router->urlFor('url_details', ['id' => (string)$urlId]))
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
         ->withStatus(302);
 })->setName('add_url');
 
-
-
-// Отображение всех URL
+// Список URL
 $app->get('/urls', function ($request, $response) {
-    $db = $this->get('db');
 
-    
-    $stmtUrls = $db->query("SELECT * FROM urls ORDER BY id DESC");
-    $urls = $stmtUrls->fetchAll(PDO::FETCH_ASSOC);
+    $urlModel = $this->get(Url::class);
+    $checkModel = $this->get(UrlCheck::class);
 
-    $stmtChecks = $db->query("
-        SELECT DISTINCT ON (url_id) *
-        FROM url_checks
-        ORDER BY url_id, created_at DESC
-    ");
-    $checks = $stmtChecks->fetchAll(PDO::FETCH_ASSOC);
+    $urls = $urlModel->getAll();
+    $checks = $checkModel->getLatestChecks();
 
     $checksByUrlId = [];
     foreach ($checks as $check) {
@@ -130,24 +112,20 @@ $app->get('/urls', function ($request, $response) {
     ]);
 })->setName('list_urls');
 
-// Отображение конкретного URL
+// Детали конкретного URL
 $app->get('/urls/{id}', function ($request, $response, $args) {
-    $db = $this->get('db');
-    $id = (int) $args['id'];
-    $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->execute();
-    $url = $stmt->fetch();
+
+    $urlModel = $this->get(Url::class);
+    $checkModel = $this->get(UrlCheck::class);
+
+    $id = (int)$args['id'];
+    $url = $urlModel->find($id);
 
     if (!$url) {
-        $renderer = $this->get('renderer');
-        return $renderer->render($response->withStatus(404), 'errors/404.phtml');
+        return $this->get('renderer')->render($response->withStatus(404), 'errors/404.phtml');
     }
 
-    $stmtChecks = $db->prepare("SELECT * FROM url_checks WHERE url_id = :url_id ORDER BY id DESC");
-    $stmtChecks->bindParam(':url_id', $id, PDO::PARAM_INT);
-    $stmtChecks->execute();
-    $checks = $stmtChecks->fetchAll();
+    $checks = $checkModel->findByUrlId($id);
 
     return $this->get('renderer')->render($response, 'urls/show.phtml', [
         'url' => $url,
@@ -156,16 +134,14 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
     ]);
 })->setName('url_details');
 
-
+// Создание проверки URL
 $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($router) {
-    $urlId = (int) $args['url_id'];
-    $db = $this->get('db');
+    $urlId = (int)$args['url_id'];
 
-    $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
-    $stmt->bindParam(':id', $urlId, PDO::PARAM_INT);
-    $stmt->execute();
-    $url = $stmt->fetch();
+    $urlModel = $this->get(Url::class);
+    $checkModel = $this->get(UrlCheck::class);
 
+    $url = $urlModel->find($urlId);
     if (!$url) {
         return $response->withStatus(404)->write('URL не найден');
     }
@@ -178,18 +154,12 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $statusCode = $res->getStatusCode();
         $html = $res->getBody()->getContents();
 
-    
-         $document = new Document($html);
-         $h1 = optional($document->first('h1'))->text();
-         $title = optional($document->first('title'))->text();
-         $description = $document->first('meta[name=description]')?->getAttribute('content');
+        $document = new Document($html);
+        $h1 = optional($document->first('h1'))->text();
+        $title = optional($document->first('title'))->text();
+        $description = $document->first('meta[name=description]')?->getAttribute('content');
 
-      
-        $stmt = $db->prepare("
-            INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
-            VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)
-        ");
-        $stmt->execute([
+        $checkModel->insert([
             ':url_id' => $urlId,
             ':status_code' => $statusCode,
             ':h1' => $h1,
@@ -202,29 +172,26 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
     } catch (ConnectException $e) {
         $this->get('flash')->addMessage('error', 'Произошла ошибка при проверке, не удалось подключиться');
     } catch (RequestException $e) {
-        $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : null;
+        $statusCode = $e->getResponse()?->getStatusCode();
 
         if ($statusCode !== null) {
-            $stmt = $db->prepare("
-                INSERT INTO url_checks (url_id, status_code, created_at)
-                VALUES (:url_id, :status_code, :created_at)
-            ");
-            $stmt->execute([
+            $checkModel->insert([
                 ':url_id' => $urlId,
                 ':status_code' => $statusCode,
+                ':h1' => null,
+                ':title' => null,
+                ':description' => null,
                 ':created_at' => $now
             ]);
-
             $this->get('flash')->addMessage('error', "Ошибка ответа. Код: $statusCode");
         } else {
             $this->get('flash')->addMessage('error', 'Ошибка запроса. Код ответа отсутствует.');
         }
     }
-    $url = $router->urlFor('url_details', ['id' => (string)$urlId]);
-    return $response
-    ->withHeader('Location', $url)
-    ->withStatus(302);
-})->setName('create_check');
 
+    return $response
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
+        ->withStatus(302);
+})->setName('create_check');
 
 $app->run();
