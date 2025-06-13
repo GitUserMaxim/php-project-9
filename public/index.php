@@ -54,7 +54,7 @@ $app->get('/', function ($request, $response) {
 // Добавление URL
 $app->post('/urls', function ($request, $response) use ($router) {
     $data = $request->getParsedBody();
-    $urlName = trim($data['url']['name']);
+    $urlName = trim($data['url']['name'] ?? '');
     $errors = Validator::validate($urlName);
 
     if (!empty($errors)) {
@@ -70,7 +70,7 @@ $app->post('/urls', function ($request, $response) use ($router) {
     if ($existingUrl) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
         return $response
-            ->withHeader('Location', $router->urlFor('url_details', ['id' => $existingUrl['id']]))
+            ->withHeader('Location', $router->urlFor('url_details', ['id' => (string)$existingUrl['id']]))
             ->withStatus(302);
     }
 
@@ -143,7 +143,8 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
 
     $url = $urlModel->find($urlId);
     if (!$url) {
-        return $response->withStatus(404)->write('URL не найден');
+        $response->getBody()->write('URL не найден');
+        return $response->withStatus(404);
     }
 
     $client = new Client(['timeout' => 10.0]);
@@ -190,7 +191,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
     }
 
     return $response
-        ->withHeader('Location', $router->urlFor('url_details', ['id' => $urlId]))
+        ->withHeader('Location', $router->urlFor('url_details', ['id' => (string)$urlId]))
         ->withStatus(302);
 })->setName('create_check');
 
