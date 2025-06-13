@@ -97,21 +97,35 @@ $app->post('/urls', function ($request, $response) use ($router) {
 $app->get('/urls', function ($request, $response) {
     $db = $this->get('db');
 
-    $sql = "SELECT DISTINCT ON (urls.id)
-    urls.id,
-    urls.name,
-    urls.created_at,
-    url_checks.created_at AS last_check,
-    url_checks.status_code AS response_code
-    FROM urls
-    LEFT JOIN url_checks ON urls.id = url_checks.url_id
-    ORDER BY urls.id DESC, url_checks.created_at DESC";
+    
+    $stmtUrls = $db->query("SELECT * FROM urls ORDER BY id DESC");
+    $urls = $stmtUrls->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $db->query($sql);
-    $urls = $stmt->fetchAll();
+    $stmtChecks = $db->query("
+        SELECT DISTINCT ON (url_id) *
+        FROM url_checks
+        ORDER BY url_id, created_at DESC
+    ");
+    $checks = $stmtChecks->fetchAll(PDO::FETCH_ASSOC);
+
+    $checksByUrlId = [];
+    foreach ($checks as $check) {
+        $checksByUrlId[$check['url_id']] = $check;
+    }
+
+    $urlsWithChecks = array_map(function ($url) use ($checksByUrlId) {
+        $check = $checksByUrlId[$url['id']] ?? null;
+        return [
+            'id' => $url['id'],
+            'name' => $url['name'],
+            'created_at' => $url['created_at'],
+            'last_check' => $check['created_at'] ?? null,
+            'response_code' => $check['status_code'] ?? null,
+        ];
+    }, $urls);
 
     return $this->get('renderer')->render($response, 'urls/index.phtml', [
-        'urls' => $urls,
+        'urls' => $urlsWithChecks,
         'flashMessages' => $this->get('flash')->getMessages()
     ]);
 })->setName('list_urls');
@@ -130,7 +144,6 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
         return $renderer->render($response->withStatus(404), 'errors/404.phtml');
     }
 
-    // Получаем список проверок для данного URL
     $stmtChecks = $db->prepare("SELECT * FROM url_checks WHERE url_id = :url_id ORDER BY id DESC");
     $stmtChecks->bindParam(':url_id', $id, PDO::PARAM_INT);
     $stmtChecks->execute();
@@ -143,12 +156,11 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
     ]);
 })->setName('url_details');
 
-// Обработчик создания новой проверки
+
 $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($router) {
     $urlId = (int) $args['url_id'];
     $db = $this->get('db');
 
-    // Получение URL из БД
     $stmt = $db->prepare("SELECT * FROM urls WHERE id = :id");
     $stmt->bindParam(':id', $urlId, PDO::PARAM_INT);
     $stmt->execute();
@@ -166,13 +178,13 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $statusCode = $res->getStatusCode();
         $html = $res->getBody()->getContents();
 
-         // SEO-анализ через DiDOM
+    
          $document = new Document($html);
          $h1 = optional($document->first('h1'))->text();
          $title = optional($document->first('title'))->text();
          $description = $document->first('meta[name=description]')?->getAttribute('content');
 
-        // Сохраняем данные в таблицу url_checks
+      
         $stmt = $db->prepare("
             INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
             VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)
@@ -193,7 +205,6 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $statusCode = $e->getResponse() ? $e->getResponse()->getStatusCode() : null;
 
         if ($statusCode !== null) {
-            // Даже при ошибке 404/500 сохраняем код
             $stmt = $db->prepare("
                 INSERT INTO url_checks (url_id, status_code, created_at)
                 VALUES (:url_id, :status_code, :created_at)
