@@ -17,9 +17,14 @@ beauty:
 
 up:
 	composer update
-	
+
 check:
 	vendor/bin/phpstan analyse --level 5 public src templates
 
 info:
 	php -S localhost:8000 -t public
+
+migrate:
+	psql "$$DATABASE_URL" -f database.sql
+
+all: install migrate start

@@ -1,7 +1,7 @@
 FROM php:8.3-cli
 
 RUN apt-get update \
-    && apt-get install -y libzip-dev libpq-dev \
+    && apt-get install -y libzip-dev libpq-dev postgresql-client \
     && docker-php-ext-install zip pdo pdo_pgsql \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
@@ -15,4 +15,4 @@ COPY . .
 
 RUN composer install
 
-CMD ["bash", "-c", "make start"]
+CMD ["make", "all"]
