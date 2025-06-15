@@ -10,7 +10,7 @@ class Validator
     {
         $v = new ValitronValidator(['url_name' => $urlName]);
         $v->rule('required', 'url_name')->message('Поле не может быть пустым');
-        $v->rule('url', 'url_name')->message('Введите корректный URL');
+        $v->rule('url', 'url_name')->message('Некорректный URL');
         if ($v->validate()) {
             return [];
         }
