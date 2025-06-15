@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Database;
+namespace App\Repositories;
 
 use PDO;
 
-class UrlCheck
+class UrlCheckRepository
 {
     private PDO $db;
 

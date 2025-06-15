@@ -2,9 +2,9 @@
 
 namespace App;
 
-class Connect
+class Connection
 {
-    private static ?Connect $instance = null;
+    private static ?Connection $instance = null;
     private \PDO $connection;
 
     private function __construct()
@@ -12,7 +12,7 @@ class Connect
         $this->connect();
     }
 
-    public static function getInstance(): Connect
+    public static function getInstance(): Connection
     {
         if (self::$instance === null) {
             self::$instance = new self();

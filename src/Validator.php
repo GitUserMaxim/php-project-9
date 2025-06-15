@@ -2,32 +2,18 @@
 
 namespace App;
 
+use Valitron\Validator as ValitronValidator;
+
 class Validator
 {
-    public static function validate(string $url): array
+    public static function validate(string $urlName): array
     {
-        $errors = [];
-
-        if (empty($url)) {
-            $errors[] = 'URL не должен быть пустым';
-            return $errors;
+        $v = new ValitronValidator(['url_name' => $urlName]);
+        $v->rule('required', 'url_name')->message('Поле не может быть пустым');
+        $v->rule('url', 'url_name')->message('Введите корректный URL');
+        if ($v->validate()) {
+            return [];
         }
-
-        if (mb_strlen($url) > 255) {
-            $errors[] = 'Адрес не должен превышать 255 символов.';
-        }
-
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            $errors[] = 'Некорректный URL';
-            return $errors;
-        }
-
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            $errors[] = 'Некорректный URL';
-        }
-
-        return $errors;
+        return $v->errors();
     }
 }
