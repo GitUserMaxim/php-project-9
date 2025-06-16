@@ -89,10 +89,10 @@ $app->post('/urls', function ($request, $response) use ($router) {
 $app->get('/urls', function ($request, $response) {
 
     $urlRepository = $this->get(Url::class);
-    $checkModel = $this->get(UrlCheck::class);
+    $checkUrl = $this->get(UrlCheck::class);
 
     $urls = $urlRepository->getAll();
-    $checks = $checkModel->getLatestChecks();
+    $checks = $checkUrl->getLatestChecks();
 
     $checksByUrlId = [];
     foreach ($checks as $check) {
@@ -121,7 +121,7 @@ $app->get('/urls', function ($request, $response) {
 $app->get('/urls/{id}', function ($request, $response, $args) {
 
     $urlRepository = $this->get(Url::class);
-    $checkModel = $this->get(UrlCheck::class);
+    $checkUrl = $this->get(UrlCheck::class);
 
     $id = (int)$args['id'];
     $url = $urlRepository->find($id);
@@ -130,7 +130,7 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
         return $this->get('renderer')->render($response->withStatus(404), 'errors/404.phtml');
     }
 
-    $checks = $checkModel->findByUrlId($id);
+    $checks = $checkUrl->findByUrlId($id);
 
     return $this->get('renderer')->render($response, 'urls/show.phtml', [
         'url' => $url,
@@ -145,7 +145,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
     $urlId = (int)$args['url_id'];
 
     $urlRepository = $this->get(Url::class);
-    $checkModel = $this->get(UrlCheck::class);
+    $checkUrl = $this->get(UrlCheck::class);
 
     $url = $urlRepository->find($urlId);
     if (!$url) {
@@ -166,7 +166,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $title = optional($document->first('title'))->text();
         $description = $document->first('meta[name=description]')?->getAttribute('content');
 
-        $checkModel->insert([
+        $checkUrl->insert([
             ':url_id' => $urlId,
             ':status_code' => $statusCode,
             ':h1' => $h1,
@@ -182,7 +182,7 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         $statusCode = $e->getResponse()?->getStatusCode();
 
         if ($statusCode !== null) {
-            $checkModel->insert([
+            $checkUrl->insert([
                 ':url_id' => $urlId,
                 ':status_code' => $statusCode,
                 ':h1' => null,
