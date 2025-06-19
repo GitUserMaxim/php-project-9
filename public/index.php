@@ -19,70 +19,76 @@ use DiDom\Document;
 
 session_start();
 
-// Контейнер
+
 $container = new Container();
 
-// Рендерер
-$container->set('renderer', function () {
-    $renderer = new PhpRenderer(__DIR__ . '/../templates');
-    $renderer->setLayout('layout.phtml');
-    return $renderer;
-});
 
-// Flash-сообщения
-$container->set('flash', fn() => new Messages());
-
-// БД и DAO
-$container->set('db', fn() => Connection::getInstance()->getConnection());
-$container->set(Url::class, fn($c) => new Url($c->get('db')));
-$container->set(UrlCheck::class, fn($c) => new UrlCheck($c->get('db')));
-
-// Приложение
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 $app->addErrorMiddleware(true, true, true);
 
-// Добавляем router в контейнер для использования в шаблонах
 $container->set('router', fn() => $app->getRouteCollector()->getRouteParser());
-$router = $app->getRouteCollector()->getRouteParser();
+
+
+$container->set('renderer', function (Container $c) {
+    $renderer = new PhpRenderer(__DIR__ . '/../templates');
+    $renderer->setLayout('layout.phtml');
+    $renderer->addAttribute('router', $c->get('router')); // Доступен во всех шаблонах
+    return $renderer;
+});
+
+$container->set('flash', fn() => new Messages());
+
+// Middleware для добавления flash-сообщений в шаблоны
+$app->add(function ($request, $handler) {
+    $this->get('renderer')->addAttribute('flashMessages', $this->get('flash')->getMessages());
+    return $handler->handle($request);
+});
+
+// База данных и репозитории
+$container->set('db', fn() => Connection::getInstance()->getConnection());
+$container->set(Url::class, fn($c) => new Url($c->get('db')));
+$container->set(UrlCheck::class, fn($c) => new UrlCheck($c->get('db')));
+
 
 // Главная страница
 $app->get('/', function ($request, $response) {
-    return $this->get('renderer')->render($response, 'home.phtml', [
-        'flashMessages' => $this->get('flash')->getMessages(),
-        'urlName' => '',
-        'router' => $this->get('router'),
-    ]);
+    return $this->get('renderer')->render($response, 'home.phtml');
 })->setName('home');
 
 // Добавление URL
-$app->post('/urls', function ($request, $response) use ($router) {
+$app->post('/urls', function ($request, $response) {
     $data = $request->getParsedBody();
-    $urlName = trim($data['url']['name'] ?? '');
+    $urlName = mb_strtolower(trim($data['url']['name'] ?? ''));
     $errors = Validator::validate($urlName);
 
     if (!empty($errors)) {
         return $this->get('renderer')->render($response->withStatus(422), 'home.phtml', [
             'errors' => $errors,
             'urlName' => $urlName,
-            'router' => $this->get('router'),
         ]);
     }
 
-    $normalizedUrl = UrlNormalizer::normalize($urlName);
+    $parsed = parse_url($urlName);
+    $scheme = mb_strtolower($parsed['scheme']);
+    $host = mb_strtolower($parsed['host']);
+    $normalizedUrl = "$scheme://$host";
 
     $urlRepository = $this->get(Url::class);
     $existingUrl = $urlRepository->findByName($normalizedUrl);
 
     if ($existingUrl) {
         $this->get('flash')->addMessage('success', 'Страница уже существует');
-        return $response->withRedirect($router->urlFor('urls.show', ['id' => (string)$existingUrl['id']]));
+        return $response->withRedirect(
+            $this->get('router')->urlFor('urls.show', ['id' => (string)$existingUrl['id']])
+        );
     }
-
 
     $urlId = $urlRepository->insert($normalizedUrl);
     $this->get('flash')->addMessage('success', 'Страница успешно добавлена');
-    return $response->withRedirect($router->urlFor('urls.show', ['id' => $urlId]));
+     return $response->withRedirect(
+         $this->get('router')->urlFor('urls.show', ['id' => $urlId])
+     );
 })->setName('urls.store');
 
 // Список URL
@@ -112,13 +118,11 @@ $app->get('/urls', function ($request, $response) {
 
     return $this->get('renderer')->render($response, 'urls/index.phtml', [
         'urls' => $urlsWithChecks,
-        'flashMessages' => $this->get('flash')->getMessages(),
-        'router' => $this->get('router'),
     ]);
 })->setName('urls.index');
 
 // Детали конкретного URL
-$app->get('/urls/{id}', function ($request, $response, $args) {
+$app->get('/urls/{id:[0-9]+}', function ($request, $response, $args) {
 
     $urlRepository = $this->get(Url::class);
     $checkUrl = $this->get(UrlCheck::class);
@@ -132,16 +136,14 @@ $app->get('/urls/{id}', function ($request, $response, $args) {
 
     $checks = $checkUrl->findByUrlId($id);
 
-    return $this->get('renderer')->render($response, 'urls/show.phtml', [
+     return $this->get('renderer')->render($response, 'urls/show.phtml', [
         'url' => $url,
         'checks' => $checks,
-        'flashMessages' => $this->get('flash')->getMessages(),
-        'router' => $this->get('router'),
-    ]);
+     ]);
 })->setName('urls.show');
 
 // Создание проверки URL
-$app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($router) {
+$app->post('/urls/{url_id}/checks', function ($request, $response, $args) {
     $urlId = (int)$args['url_id'];
 
     $urlRepository = $this->get(Url::class);
@@ -196,7 +198,9 @@ $app->post('/urls/{url_id}/checks', function ($request, $response, $args) use ($
         }
     }
 
-    return $response->withRedirect($router->urlFor('urls.show', ['id' => (string)$urlId]));
+     return $response->withRedirect(
+         $this->get('router')->urlFor('urls.show', ['id' => (string)$urlId])
+     );
 })->setName('urls.checks.store');
 
 $app->run();
